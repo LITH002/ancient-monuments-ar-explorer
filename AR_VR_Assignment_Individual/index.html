@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Ancient Monuments AR Explorer</title>
+
+  <!-- A-Frame + MindAR -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    #label {
+      position: fixed;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      color: #FFD700;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-size: 14px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      pointer-events: none;
+      font-weight: bold;
+    }
+
+    #status {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      pointer-events: none;
+      text-align: center;
+      backdrop-filter: blur(5px);
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 30px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 10px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 25px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    .btn-audio {
+      background: #FF6B6B;
+      color: white;
+    }
+
+    .btn-audio.playing {
+      background: #FF4757;
+      color: white;
+    }
+
+    .btn-info {
+      background: #4D96FF;
+      color: white;
+    }
+
+    .btn-info.active {
+      background: #FF4757;
+      color: white;
+    }
+
+    .btn-mode {
+      background: #2D3436;
+      color: white;
+    }
+
+    #loader {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 99999;
+      color: #FFD700;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 15px;
+      border: 4px solid rgba(255, 215, 0, 0.1);
+      border-top: 4px solid #FFD700;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #markerless-scene { display: none; }
+    #marker-scene, #markerless-scene {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== UI ===== -->
+  <div id="label">Scan Your Brochure</div>
+  <div id="status">Searching for marker...</div>
+
+  <div id="controls">
+    <button id="audio-btn" class="btn btn-audio" onclick="toggleAudio()">🔊 Narration</button>
+  </div>
+
+  <button id="mode-btn" class="btn btn-mode">Switch to Diorama</button>
+
+  <div id="loader">
+    <div class="spinner"></div>
+    <div>Loading Watadage AR...</div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- SCENE 1: MARKER-BASED AR                   -->
+  <!-- ========================================== -->
+  <a-scene id="marker-scene"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes;"
+    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: false; powerPreference: high-performance;"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: true">
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-assets>
+      <a-asset-item id="watadageModel" src="./assets/models/watadageya.glb"></a-asset-item>
+      <a-asset-item id="narrationAudio" src="./assets/audio/watadage-narration.mp3"></a-asset-item>
+      <a-asset-item id="buddhaModel" src="./assets/models/buddha-statue.glb"></a-asset-item>
+    </a-assets>
+
+    <a-entity light="type: ambient; intensity: 0.8; color: #FFF8E7"></a-entity>
+    <a-entity light="type: directional; intensity: 1.2; color: #FFFFFF" position="2 3 2"></a-entity>
+    <a-entity light="type: directional; intensity: 0.4; color: #FFF8E7" position="-2 1 -2"></a-entity>
+
+    <!-- ===== MARKER TARGET ===== -->
+    <a-entity mindar-image-target="targetIndex: 0">
+
+      <!-- Main Watadage Model -->
+      <a-gltf-model id="watadage-marker" 
+                    src="#watadageModel" 
+                    position="0 0 0" 
+                    rotation="0 -90 0" 
+                    scale="0.1 0.1 0.1"
+                    animation="property: rotation; 
+                               to: 0 270 0; 
+                               dur: 20000; 
+                               loop: true; 
+                               easing: linear;">
+      </a-gltf-model>
+
+      <!-- Buddha Statue -->
+      <!-- <a-gltf-model id="buddha-marker" 
+                    src="#buddhaModel" 
+                    position="0.3 0 0.3" 
+                    rotation="0 0 0" 
+                    scale="0.03 0.03 0.03" 
+                    visible="false">
+      </a-gltf-model> -->
+
+      <!-- Title Text -->
+      <a-text value="WATADAGE" 
+              position="0 0.6 0" 
+              scale="0.5 0.5 0.5" 
+              color="#FFD700"
+              background-color="rgba(0,0,0,0.7)" 
+              background-padding="0.1" 
+              align="center">
+      </a-text>
+
+      <!-- Glow Effect -->
+      <a-plane width="0.8" height="0.8" 
+               rotation="-90 0 0" 
+               color="#FFD700" 
+               transparent="true" 
+               opacity="0.08">
+      </a-plane>
+
+    </a-entity>
+  </a-scene>
+
+  <!-- ========================================== -->
+  <!-- SCENE 2: MARKERLESS AR (Diorama)          -->
+  <!-- ========================================== -->
+  <a-scene id="markerless-scene" 
+    webxr="requiredFeatures: local-floor; optionalFeatures: hit-test;"
+    ar-hit-test="target:#reticle;" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: true"
+    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: false; powerPreference: high-performance;">
+
+    <a-entity light="type: ambient; intensity: 0.8; color: #FFF8E7"></a-entity>
+    <a-entity light="type: directional; intensity: 1.2; color: #FFFFFF" position="2 3 2"></a-entity>
+
+    <a-camera position="0 1.6 0"></a-camera>
+
+    <a-assets>
+      <a-asset-item id="watadageModel" src="./assets/models/watadageya.glb"></a-asset-item>
+      <a-asset-item id="buddhaModel" src="./assets/models/buddha-statue.glb"></a-asset-item>
+    </a-assets>
+
+    <a-entity id="reticle" visible="false"
+      geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.04; segmentsTheta: 32"
+      material="color: #FFD700; transparent: true; opacity: 0.9; emissive: #FFD700; emissiveIntensity: 0.3"
+      animation="property: scale; to: 1.2 1.2 1.2; dur: 500; loop: true; dir: alternate">
+    </a-entity>
+
+    <a-entity id="placed-diorama" visible="false">
+
+      <a-cylinder radius="0.4" height="0.02" color="#8B4513" position="0 0.01 0"></a-cylinder>
+
+      <a-gltf-model id="diorama-watadage" 
+                    src="#watadageModel" 
+                    position="0 0.02 0" 
+                    rotation="0 0 0" 
+                    scale="0.03 0.03 0.03">
+      </a-gltf-model>
+
+      <a-gltf-model id="diorama-buddha" 
+                    src="#buddhaModel" 
+                    position="0.2 0.02 0.2" 
+                    rotation="0 0 0" 
+                    scale="0.02 0.02 0.02" 
+                    visible="false">
+      </a-gltf-model>
+
+      <a-text value="🏛️ WATADAGE DIORAMA" 
+              position="0 0.35 0" 
+              scale="0.35 0.35 0.35" 
+              color="#FFD700"
+              background-color="rgba(0,0,0,0.6)" 
+              background-padding="0.05" 
+              align="center">
+      </a-text>
+
+    </a-entity>
+
+  </a-scene>
+
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT                                  -->
+  <!-- ========================================== -->
+  <script>
+    // ==========================================
+    // REFERENCES
+    // ==========================================
+    const markerScene = document.getElementById('marker-scene');
+    const markerlessScene = document.getElementById('markerless-scene');
+    const modeBtn = document.getElementById('mode-btn');
+    const label = document.getElementById('label');
+    const status = document.getElementById('status');
+    const loader = document.getElementById('loader');
+    const audioBtn = document.getElementById('audio-btn');
+    const infoBtn = document.getElementById('info-btn');
+
+    let isMarkerless = false;
+    let isAudioOn = false;
+    let isInfoVisible = false;
+    let audio = null;
+    let targetFoundCount = 0;
+
+    // ==========================================
+    // HIDE LOADER
+    // ==========================================
+    setTimeout(() => {
+      loader.style.transition = 'opacity 0.8s';
+      loader.style.opacity = '0';
+      setTimeout(() => { loader.style.display = 'none'; }, 800);
+    }, 3000);
+
+    // ==========================================
+    // MODE SWITCH
+    // ==========================================
+    modeBtn.addEventListener('click', function () {
+      isMarkerless = !isMarkerless;
+
+      if (isMarkerless) {
+        markerScene.style.display = 'none';
+        markerlessScene.style.display = 'block';
+        label.textContent = 'Tap Floor for Diorama';
+        status.textContent = 'Point at floor/table';
+        modeBtn.textContent = 'Switch to Scan Mode';
+        try { markerlessScene.enterAR(); } catch (e) { }
+      } else {
+        markerScene.style.display = 'block';
+        markerlessScene.style.display = 'none';
+        label.textContent = 'Scan Watadage Brochure';
+        status.textContent = 'Searching for marker...';
+        modeBtn.textContent = 'Switch to Diorama';
+        try { markerlessScene.exitAR(); } catch (e) { }
+      }
+    });
+
+    // ==========================================
+    // MARKERLESS HIT TESTING
+    // ==========================================
+    markerlessScene.addEventListener('ar-hit-test-achieved', function () {
+      document.getElementById('reticle').setAttribute('visible', 'true');
+      status.textContent = 'Surface found! Tap to place';
+    });
+
+    markerlessScene.addEventListener('ar-hit-test-select', function (event) {
+      const pos = event.detail.position;
+      const diorama = document.getElementById('placed-diorama');
+      diorama.setAttribute('visible', 'true');
+      diorama.setAttribute('position', pos.x + ' ' + pos.y + ' ' + pos.z);
+      document.getElementById('reticle').setAttribute('visible', 'false');
+      status.textContent = 'Diorama placed!';
+      label.textContent = 'Explore the diorama!';
+
+      setTimeout(() => {
+        document.getElementById('diorama-buddha').setAttribute('visible', 'true');
+      }, 2000);
+
+      setTimeout(() => {
+        status.textContent = 'Tap floor to move';
+      }, 3000);
+    });
+
+    markerlessScene.addEventListener('ar-hit-test-unachieved', function () {
+      document.getElementById('reticle').setAttribute('visible', 'false');
+    });
+
+    // ==========================================
+    // MARKER DETECTION
+    // ==========================================
+    markerScene.addEventListener('targetFound', function () {
+      targetFoundCount++;
+      console.log('Marker detected! (' + targetFoundCount + ')');
+      status.textContent = 'Watadage revealed!';
+      label.textContent = 'WATADAGE REVEALED';
+
+      // Auto-show info for 3 seconds on detection
+      if (!isInfoVisible) {
+        const infoText = document.getElementById('info-text-marker');
+        infoText.setAttribute('visible', 'true');
+        setTimeout(() => {
+          if (!isInfoVisible) {
+            infoText.setAttribute('visible', 'false');
+          }
+        }, 4000);
+      }
+
+      if (isAudioOn) playNarration();
+
+      setTimeout(() => {
+        label.textContent = '🏛️ Scan Watadage Brochure';
+      }, 4000);
+    });
+
+    markerScene.addEventListener('targetLost', function () {
+      status.textContent = '🔍 Searching for marker...';
+      if (!isInfoVisible) {
+        document.getElementById('info-text-marker').setAttribute('visible', 'false');
+      }
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    });
+
+    // ==========================================
+    // AUDIO FUNCTIONS
+    // ==========================================
+    function toggleAudio() {
+      isAudioOn = !isAudioOn;
+
+      if (isAudioOn) {
+        playNarration();
+        audioBtn.textContent = '🔇 Stop Narration';
+        audioBtn.classList.add('playing');
+        status.textContent = '🔊 Narration playing...';
+      } else {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+        audioBtn.textContent = '🔊 Narration';
+        audioBtn.classList.remove('playing');
+        status.textContent = '🔇 Narration stopped';
+        setTimeout(() => {
+          status.textContent = '✅ Watadage revealed!';
+        }, 2000);
+      }
+    }
+
+    function playNarration() {
+      try {
+        if (!audio) {
+          audio = new Audio('./assets/audio/watadage-narration.mp3');
+          audio.loop = false;
+          audio.volume = 0.7;
+          
+          audio.onended = function () {
+            status.textContent = '📖 Narration complete';
+            audioBtn.textContent = '🔊 Narration';
+            audioBtn.classList.remove('playing');
+            isAudioOn = false;
+            setTimeout(() => {
+              status.textContent = '✅ Watadage revealed!';
+            }, 2000);
+          };
+        }
+        
+        audio.play();
+      } catch(e) {
+        console.warn('⚠️ Audio error:', e);
+        status.textContent = '⚠️ Audio unavailable';
+        isAudioOn = false;
+        audioBtn.textContent = '🔊 Narration';
+        audioBtn.classList.remove('playing');
+      }
+    }
+
+    // ==========================================
+    // KEYBOARD SHORTCUTS
+    // ==========================================
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'm' || e.key === 'M') modeBtn.click();
+      if (e.key === 'a' || e.key === 'A') toggleAudio();
+      if (e.key === 'i' || e.key === 'I') toggleInfo();
+    });
+
+    console.log('Watadage AR Explorer Ready!');
+    console.log('M=Switch Mode, A=Toggle Audio, I=Toggle Info');
+    console.log('Model: watadageya.glb');
+  </script>
+
+</body>
+
+</html>
